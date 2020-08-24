@@ -1,0 +1,13 @@
+[package]
+name = "renderer-rs"
+version = "0.1.0"
+authors = ["Nakano Masaki <namachan10777@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+protobuf = "2.17.0"
+
+[build-dependencies]
+protobuf-codegen-pure = "2.17.0"
