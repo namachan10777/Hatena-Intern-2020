@@ -5,6 +5,8 @@ import (
 	"context"
 	"html/template"
 	"regexp"
+	"sync"
+
 	pb_title_fetcher "github.com/hatena/Hatena-Intern-2020/services/renderer-go/pb/title_fetcher"
 )
 
@@ -32,15 +34,33 @@ func Render(ctx context.Context, cli pb_title_fetcher.TitleFetcherClient, src st
 		}
 		return w.String()
 	})
+	tags := emptyLinkTagRE.FindAllString(html, -1)
+	urlMap := make(map[string]string)
+	urlMapMutex := &sync.Mutex{}
+	var wg sync.WaitGroup
+	for _, tag := range tags {
+		wg.Add(1)
+		go func(rawTag string) {
+			url := urlRE.FindStringSubmatch(rawTag)[0]
+			if title, err := cli.Fetch(ctx, &pb_title_fetcher.FetchRequest{ Url: url, }); err == nil {
+				urlMapMutex.Lock()
+				urlMap[url] = title.Title
+				urlMapMutex.Unlock()
+			}
+			wg.Done()
+		}(tag)
+	}
+	wg.Wait()
 	converted := emptyLinkTagRE.ReplaceAllStringFunc(html, func(a string) string {
 		// lenth must be at least 1
-		url := urlRE.FindStringSubmatch(a)
+		url := urlRE.FindStringSubmatch(a)[0]
 		link := Link {
-			Url: url[0],
-			Title: url[0],
+			Url: url,
+			Title: url,
 		}
-		if title, err := cli.Fetch(ctx, &pb_title_fetcher.FetchRequest{ Url: url[0], }); err == nil {
-			link.Title = title.Title
+		title, isThere := urlMap[url]
+		if isThere {
+			link.Title = title
 		}
 		var w bytes.Buffer
 		if err := linkTmpl.ExecuteTemplate(&w, "link", link); err != nil {
