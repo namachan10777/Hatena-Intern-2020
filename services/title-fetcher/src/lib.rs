@@ -24,13 +24,22 @@ enum Error {
 // TODO test fetch_title
 // how to test async function?
 async fn fetch_title(url: &str) -> Result<String, Error> {
-    let res = reqwest::get(url).await.map_err(|e| {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_millis(1000))
+        .build()
+        .map_err(|e| Error::Internal(format!("{:?}", e)))?;
+    let res = client.get(url).send().await.map_err(|e| {
         e.status()
             .map_or_else(|| Error::Internal(format!("{:?}", e)), Error::HTTP)
     })?;
-    let body = res.text().await.map_err(|_| Error::FailedToSerialize)?;
-    let title = parser::parse(&mut io::Cursor::new(body));
-    Ok(title.unwrap_or_else(String::new))
+    if !res.status().is_success() && !res.status().is_redirection() {
+        Err(Error::HTTP(res.status()))
+    }
+    else {
+        let body = res.text().await.map_err(|_| Error::FailedToSerialize)?;
+        let title = parser::parse(&mut io::Cursor::new(body));
+        Ok(title.unwrap_or_else(String::new))
+    }
 }
 
 #[tonic::async_trait]
