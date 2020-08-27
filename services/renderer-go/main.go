@@ -17,6 +17,7 @@ import (
 	server "github.com/hatena/Hatena-Intern-2020/services/renderer-go/grpc"
 	"github.com/hatena/Hatena-Intern-2020/services/renderer-go/log"
 	pb "github.com/hatena/Hatena-Intern-2020/services/renderer-go/pb/renderer"
+	pb_title_fetcher "github.com/hatena/Hatena-Intern-2020/services/renderer-go/pb/title_fetcher"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -35,6 +36,13 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %+v", err)
 	}
+
+	titleFetcherConn, err := grpc.Dial(conf.TitleFetcherAddr, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return fmt.Errorf("failed to connect title-fetcher service: %+v", err)
+	}
+	defer titleFetcherConn.Close()
+	titleFetcherCli := pb_title_fetcher.NewTitleFetcherClient(titleFetcherConn)
 
 	// ロガーを初期化
 	logger, err := log.NewLogger(log.Config{Mode: conf.Mode})
@@ -56,7 +64,7 @@ func run(args []string) error {
 			grpc_recovery.UnaryServerInterceptor(),
 		)),
 	)
-	svr := server.NewServer()
+	svr := server.NewServer(titleFetcherCli)
 	pb.RegisterRendererServer(s, svr)
 	healthpb.RegisterHealthServer(s, svr)
 	go stop(s, conf.GracefulStopTimeout, logger)

@@ -39,7 +39,25 @@ docker run -v "$(pwd):/pb" -w /pb --rm hatena-intern-2020-protoc-ts \
     --grpc_out=ts/renderer \
     --ts_out=ts/renderer \
     renderer.proto
-mkdir -p ../services/renderer-go/pb ../services/renderer-ts/pb ../services/blog/pb
+
+mkdir -p go/title_fetcher ts/title_fetcher
+docker run -v "$(pwd):/pb" -w /pb --rm hatena-intern-2020-protoc-go \
+  protoc \
+    --go_out=plugins=grpc:go/title_fetcher \
+    --go_opt=paths=source_relative \
+    title_fetcher.proto
+docker run -v "$(pwd):/pb" -w /pb --rm hatena-intern-2020-protoc-ts \
+  grpc_tools_node_protoc \
+    --plugin=protoc-gen-ts=/usr/local/share/.config/yarn/global/node_modules/grpc_tools_node_protoc_ts/bin/protoc-gen-ts \
+    --js_out=import_style=commonjs,binary:ts/title_fetcher \
+    --grpc_out=ts/title_fetcher \
+    --ts_out=ts/title_fetcher \
+    title_fetcher.proto
+mkdir -p ../services/title_fetcher-go/pb ../services/title_fetcher-ts/pb
+cp -r ./go/title_fetcher ../services/renderer-go/pb
+cp -r ./ts/title_fetcher ../services/renderer-ts/pb
+
+mkdir -p ../services/blog/pb
 cp -r ./go/renderer ../services/renderer-go/pb
 cp -r ./ts/renderer ../services/renderer-ts/pb
 cp -r ./go/renderer ../services/blog/pb
