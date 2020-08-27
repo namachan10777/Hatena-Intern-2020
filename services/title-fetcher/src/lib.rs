@@ -7,9 +7,14 @@ use pb::title_fetcher_server::{TitleFetcher, TitleFetcherServer};
 use pb::{FetchReply, FetchRequest};
 use std::io;
 use std::time;
+use regex::Regex;
+use tokio::time::delay_for;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 use tonic::{Code, Request, Response, Status};
+
+const ACCESS_LIMIT: usize = 100;
+const DOMAIN_RE_PAT: &'static str = r"(https?://[^\s|^/]+)";
 
 pub mod parser;
 pub mod pb {
@@ -19,12 +24,14 @@ pub mod pb {
 #[derive(Default)]
 pub struct TitleFetcherService {
     cache: RwLock<HashMap<String, (Result<String, Error>, std::time::SystemTime)>>,
+    request_count: RwLock<HashMap<String, usize>>,
 }
 
 #[derive(PartialEq, Debug, Clone)]
 enum Error {
     HTTP(reqwest::StatusCode),
     Internal(String),
+    InvalidHttpURL,
     FailedToSerialize,
 }
 
@@ -63,7 +70,35 @@ impl TitleFetcherService {
             }
             // drop lock
         }
+        let domain_re = Regex::new(DOMAIN_RE_PAT).unwrap();
+        let domain = domain_re.captures(&url);
+        let domain = if let Some(domain) = domain {
+            domain.get(0).unwrap().as_str()
+        }
+        else {
+            return Err(Error::InvalidHttpURL)
+        };
+        let mut wait = 1;
+        loop {
+            let limit = {
+                let reader = self.request_count.read().await;
+                reader.get(domain).cloned().unwrap_or(0)
+            };
+            println!("delay {} for {}", wait, domain);
+            if limit < ACCESS_LIMIT {
+                let mut writer = self.request_count.write().await;
+                writer.insert(domain.to_owned(), limit+1);
+                break;
+            }
+            delay_for(time::Duration::from_secs(wait)).await;
+            wait *= 2;
+        }
         let res = fetch_title(&url).await;
+        let mut writer = self.request_count.write().await;
+        let count = writer.get(domain).cloned().unwrap_or(0);
+        if count > 0 {
+            writer.insert(domain.to_owned(), count-1);
+        }
         let mut writer = self.cache.write().await;
         writer.insert(url, (res.clone(), time::SystemTime::now()));
         res
@@ -78,6 +113,10 @@ impl TitleFetcher for TitleFetcherService {
             Err(Error::HTTP(status)) => Err(Status::new(
                 Code::InvalidArgument,
                 format!("failed to request via HTTP: {:?}", status),
+            )),
+            Err(Error::InvalidHttpURL) => Err(Status::new(
+                Code::InvalidArgument,
+                "Invalid argument msg: invalid HTTP URL".to_owned(),
             )),
             Err(Error::Internal(msg)) => Err(Status::new(
                 Code::InvalidArgument,
@@ -112,5 +151,11 @@ mod test {
             fetch_title("https://google.com/nowhere").await,
             Err(Error::HTTP(reqwest::StatusCode::from_u16(404).unwrap()))
         );
+    }
+
+    #[test]
+    fn domain_re() {
+        let re = Regex::new(DOMAIN_RE_PAT).unwrap();
+        assert_eq!(re.captures("https://google.com/hogehoge/fugafuga").unwrap().get(0).unwrap().as_str(), "https://google.com");
     }
 }
