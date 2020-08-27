@@ -41,11 +41,11 @@ spec:
             name: renderer-go-app-env-vars
         resources:
           requests:
-            cpu: 10m
-            memory: 5Mi
-          limits:
             cpu: 20m
             memory: 10Mi
+          limits:
+            cpu: 40m
+            memory: 20Mi
         ports:
         - containerPort: 50051
           name: renderer-go
