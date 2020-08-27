@@ -1,11 +1,12 @@
 #[macro_use]
 extern crate html5ever;
+extern crate tokio;
 extern crate tonic;
 
-use tonic::{Code, Request, Response, Status};
 use pb::title_fetcher_server::{TitleFetcher, TitleFetcherServer};
 use pb::{FetchReply, FetchRequest};
 use std::io;
+use tonic::{Code, Request, Response, Status};
 
 pub mod parser;
 pub mod pb {
@@ -15,6 +16,7 @@ pub mod pb {
 #[derive(Default)]
 pub struct TitleFetcherService {}
 
+#[derive(PartialEq, Debug)]
 enum Error {
     HTTP(reqwest::StatusCode),
     Internal(String),
@@ -65,5 +67,25 @@ impl TitleFetcher for TitleFetcherService {
 }
 
 pub fn get_service() -> pb::title_fetcher_server::TitleFetcherServer<TitleFetcherService> {
-   TitleFetcherServer::new(TitleFetcherService::default())
+    TitleFetcherServer::new(TitleFetcherService::default())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[tokio::test]
+    async fn fetch_google() {
+        assert_eq!(
+            fetch_title("https://google.com").await,
+            Ok("Google".to_owned())
+        );
+    }
+
+    #[tokio::test]
+    async fn fetch_404() {
+        assert_eq!(
+            fetch_title("https://google.com/nowhere").await,
+            Err(Error::HTTP(reqwest::StatusCode::from_u16(404).unwrap()))
+        );
+    }
 }
