@@ -50,3 +50,11 @@ func Test_Render_List(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "<ul>\n<li>li1</li>\n<li>li2</li>\n<li>li3</li>\n</ul>\n", html)
 }
+
+func Test_Ban_Raw_HTML(t *testing.T) {
+	src := "<div id=\"root\"></div>"
+	html, err := Render(context.Background(), src)
+	assert.NoError(t, err)
+	assert.Equal(t, "<!-- raw HTML omitted -->\n", html)
+}
+
