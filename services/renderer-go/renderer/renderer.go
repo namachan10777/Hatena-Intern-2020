@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"regexp"
 
+	"errors"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 )
@@ -24,7 +25,7 @@ func Render(ctx context.Context, src string) (string, error) {
 		goldmark.WithExtensions(extension.GFM),
 	)
 	if err := md.Convert([]byte(src), &htmlBuf); err != nil {
-		panic(err)
+		return src, errors.New("failed to convert markdown")
 	}
 	fullConverted := gamingRE.ReplaceAllStringFunc(htmlBuf.String(), func(inner string) string {
 		return fmt.Sprintf("<span class=\"gaming\">%s</span>", inner[2:len(inner)-2])
