@@ -6,6 +6,9 @@ extern crate tonic;
 use pb::title_fetcher_server::{TitleFetcher, TitleFetcherServer};
 use pb::{FetchReply, FetchRequest};
 use std::io;
+use std::time;
+use std::collections::HashMap;
+use tokio::sync::RwLock;
 use tonic::{Code, Request, Response, Status};
 
 pub mod parser;
@@ -14,9 +17,11 @@ pub mod pb {
 }
 
 #[derive(Default)]
-pub struct TitleFetcherService {}
+pub struct TitleFetcherService {
+    cache: RwLock<HashMap<String, (Result<String, Error>, std::time::SystemTime)>>,
+}
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 enum Error {
     HTTP(reqwest::StatusCode),
     Internal(String),
@@ -44,12 +49,32 @@ async fn fetch_title(url: &str) -> Result<String, Error> {
     }
 }
 
+impl TitleFetcherService {
+    async fn get_title(&self, url: String) -> Result<String, Error> {
+        // to free lock early.
+        {
+            let reader = self.cache.read().await;
+            if let Some((cached, timestamp)) = reader.get(&url) {
+                if let Ok(dur) = timestamp.elapsed() {
+                    if dur > time::Duration::from_secs(10) {
+                        return cached.clone()
+                    }
+                }
+            }
+            // drop lock
+        }
+        let res = fetch_title(&url).await;
+        let mut writer = self.cache.write().await;
+        writer.insert(url, (res.clone(), time::SystemTime::now()));
+        res
+    }
+}
+
 #[tonic::async_trait]
 impl TitleFetcher for TitleFetcherService {
     async fn fetch(&self, request: Request<FetchRequest>) -> Result<Response<FetchReply>, Status> {
-        println!("Got a request from {:?}", request.remote_addr());
-        match fetch_title(&request.into_inner().url).await {
-            Ok(title) => Ok(Response::new(pb::FetchReply { title })),
+        match self.get_title(request.into_inner().url).await  {
+            Ok(title) => Ok(Response::new(FetchReply{ title })),
             Err(Error::HTTP(status)) => Err(Status::new(
                 Code::InvalidArgument,
                 format!("failed to request via HTTP: {:?}", status),
