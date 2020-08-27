@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	pb "github.com/hatena/Hatena-Intern-2020/services/renderer-go/pb/renderer"
@@ -14,10 +15,12 @@ type MockTitleFetcher struct {
 }
 
 func (m MockTitleFetcher) Fetch(ctx context.Context, req *pb_title_fetcher.FetchRequest, options ...grpc.CallOption) (*pb_title_fetcher.FetchReply, error) {
-	reply := pb_title_fetcher.FetchReply {
-		Title: "hoge",
+		reply := new(pb_title_fetcher.FetchReply)
+	if req.Url == "https://namachan10777.dev" {
+		reply.Title = "namachan10777"
+		return reply, nil
 	}
-	return &reply, nil
+	return nil, errors.New("Something happened")
 }
 
 func Test_Server_Render(t *testing.T) {

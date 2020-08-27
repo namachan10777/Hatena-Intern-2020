@@ -6,3 +6,4 @@ configMapGenerator:
 - name: renderer-go-app-env-vars
   literals:
   - MODE=development
+  - TITLE_FETCHER_ADDR=title-fetcher:50051
