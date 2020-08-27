@@ -37,6 +37,13 @@ func Test_Render_Link(t *testing.T) {
 	assert.Equal(t, "<p><a href=\"https://namachan10777.dev\">namachan10777</a></p>\n", html)
 }
 
+func Test_Render_RawLink(t *testing.T) {
+	src := "https://namachan10777.dev"
+	html, err := Render(context.Background(), src)
+	assert.NoError(t, err)
+	assert.Equal(t, "<p><a href=\"https://namachan10777.dev\">https://namachan10777.dev</a></p>\n", html)
+}
+
 func Test_Render_List(t *testing.T) {
 	src := "* li1\n* li2\n* li3"
 	html, err := Render(context.Background(), src)
