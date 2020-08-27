@@ -152,7 +152,10 @@ mod test {
               <div id="root"></div>
             </body>
         "#;
-        assert_eq!(parse(&mut std::io::Cursor::new(title)), Some("Hello World!".to_owned()));
+        assert_eq!(
+            parse(&mut std::io::Cursor::new(title)),
+            Some("Hello World!".to_owned())
+        );
     }
     #[test]
     fn xhtml() {
@@ -171,7 +174,10 @@ mod test {
            </body>
     </html>
         "#;
-        assert_eq!(parse(&mut std::io::Cursor::new(title)), Some("Hello World!".to_owned()));
+        assert_eq!(
+            parse(&mut std::io::Cursor::new(title)),
+            Some("Hello World!".to_owned())
+        );
     }
 
     #[test]
@@ -187,9 +193,11 @@ mod test {
               <div id="root">
             </bo>
         "#;
-        assert_eq!(parse(&mut std::io::Cursor::new(title)), Some("Hello World!".to_owned()));
+        assert_eq!(
+            parse(&mut std::io::Cursor::new(title)),
+            Some("Hello World!".to_owned())
+        );
     }
-
 
     #[test]
     fn notitle() {
